@@ -1,8 +1,8 @@
 # I-Shell
 
-**I-Shell** (short for *Intelligent Shell*) is a single script that upgrades your terminal with modern IDE-like features — inline autosuggestions, syntax highlighting, fuzzy history search, smart completions — for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew) and **Debian/Ubuntu/Kali** (apt). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
+**I-Shell** (short for *Intelligent Shell*) is a single script that upgrades your terminal with modern IDE-like features - inline autosuggestions, syntax highlighting, fuzzy history search, smart completions - for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew) and **Debian/Ubuntu/Kali** (apt). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
 
-Safe to re-run — every step checks before installing, appending, or removing.
+Safe to re-run - every step checks before installing, appending, or removing.
 
 ## What you get
 
@@ -20,7 +20,7 @@ Optional add-ons:
 ## Requirements
 
 - macOS with [Homebrew](https://brew.sh/), or Debian/Ubuntu/Kali with `apt`
-- `git` and `make` (only if you use bash — needed to build `ble.sh`)
+- `git` and `make` (only if you use bash - needed to build `ble.sh`)
 - `curl` (only if the Starship or Ghostty fallback installers run)
 
 ## Usage
@@ -64,7 +64,7 @@ Every uninstall step is opt-in, so you can drop things selectively (e.g. keep fz
 
 The whole point of installing this stuff is these shortcuts.
 
-### fzf — fuzzy pickers (all shells)
+### fzf - fuzzy pickers (all shells)
 
 | Shortcut | What it does |
 |---|---|
@@ -74,7 +74,7 @@ The whole point of installing this stuff is these shortcuts.
 
 Inside any fzf picker: type to filter, `↑`/`↓` to move, `Enter` to accept, `Esc` to cancel, `Tab` to multi-select.
 
-### Autosuggestions — the greyed-out ghost text
+### Autosuggestions - the greyed-out ghost text
 
 Applies to zsh (`zsh-autosuggestions`), bash (`ble.sh`), and fish (built-in). Suggestions come from your history and directory context.
 
@@ -93,7 +93,7 @@ Applies to zsh (`zsh-autosuggestions`), bash (`ble.sh`), and fish (built-in). Su
 | `Tab Tab` (zsh) | Show the full menu of matches |
 | `Shift-Tab` (zsh menu) | Cycle backwards through matches |
 
-Tab now completes flags, subcommands, git branches, remote hosts, package names, and more — driven by `zsh-completions` / `bash-completion` / fish's built-in system.
+Tab now completes flags, subcommands, git branches, remote hosts, package names, and more - driven by `zsh-completions` / `bash-completion` / fish's built-in system.
 
 ### Line editing (built-in but worth remembering)
 
@@ -121,7 +121,7 @@ Every append is guarded by a marker check, so re-running the script is idempoten
 - **bash** has no first-class equivalent to `zsh-autosuggestions`, so the script installs [ble.sh](https://github.com/akinomyoga/ble.sh), which provides both autosuggestions and syntax highlighting. First install takes a minute (git clone + `make`).
 - **fish** ships with autosuggestions and highlighting out of the box, so its setup is the shortest.
 - **Ghostty on Debian/Ubuntu/Kali**: apt only carries Ghostty on Ubuntu 26.04+. On older releases the script offers to download the community `.deb` installer from [mkasberg/ghostty-ubuntu](https://github.com/mkasberg/ghostty-ubuntu) to a temp file so you can inspect it before running.
-- Same pattern for the Starship fallback installer — it's downloaded to a temp file, then run only after you confirm. No blind `curl | bash`.
+- Same pattern for the Starship fallback installer - it's downloaded to a temp file, then run only after you confirm. No blind `curl | bash`.
 - If `compaudit` reports insecure zsh directories, the script fixes their permissions automatically.
 
 ## License
