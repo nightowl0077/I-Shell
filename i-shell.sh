@@ -378,7 +378,9 @@ background-blur = true"
   fi
 
   if ask_yes_no "Add a git-aware prompt (shows branch/status) via Starship — works in zsh/bash/fish?"; then
-    if ! install_pkg "starship" 2>/dev/null; then
+    if command -v starship >/dev/null 2>&1; then
+      info "starship already installed ($(command -v starship))"
+    elif ! install_pkg "starship" 2>/dev/null; then
       local SS_URL="https://starship.rs/install.sh"
       warn "starship isn't packaged here — the official installer is at $SS_URL"
       ask_yes_no "Download it to a temp file so you can inspect, then run it?" \
