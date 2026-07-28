@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# uninstall-shell-intellisense.sh
+# uninstall-i-shell.sh  (I-Shell = Intelligent Shell)
 #
-# Reverses everything setup-shell-intellisense.sh did:
+# Reverses everything setup-i-shell.sh did:
 #   - removes the source lines it added to your shell rc file
 #   - uninstalls the packages it installed (with confirmation)
 #   - deletes ble.sh, Starship, and Ghostty (each optional)
 #   - restores the most recent Ghostty config backup, if one exists
 #
 # Usage:
-#   ./uninstall-shell-intellisense.sh            # auto-detects your current shell
-#   ./uninstall-shell-intellisense.sh zsh        # or force one
-#   ./uninstall-shell-intellisense.sh bash
-#   ./uninstall-shell-intellisense.sh fish
+#   ./uninstall-i-shell.sh            # auto-detects your current shell
+#   ./uninstall-i-shell.sh zsh        # or force one
+#   ./uninstall-i-shell.sh bash
+#   ./uninstall-i-shell.sh fish
 #
 # Safe to re-run: every step checks before removing anything.
 
@@ -229,7 +229,7 @@ uninstall_starship() {
 
 # ---------- dispatch ----------
 echo ""
-warn "This will remove Intelligent Terminal's changes from your shell config."
+warn "This will remove I-Shell's changes from your shell config."
 warn "A timestamped backup of each rc file will be saved as <rcfile>.uninstall-bak.<epoch>."
 ask_yes_no "Continue?" || { info "Aborted."; exit 0; }
 

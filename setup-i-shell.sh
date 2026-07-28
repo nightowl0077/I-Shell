@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# setup-shell-intellisense.sh
+# setup-i-shell.sh  (I-Shell = Intelligent Shell)
 #
 # Sets up autosuggestions + syntax highlighting + fuzzy search + completions
 # for zsh, bash, or fish — on macOS (Homebrew) or Linux (apt).
 #
 # Usage:
-#   ./setup-shell-intellisense.sh            # auto-detects your current shell
-#   ./setup-shell-intellisense.sh zsh        # force a specific shell
-#   ./setup-shell-intellisense.sh bash
-#   ./setup-shell-intellisense.sh fish
+#   ./setup-i-shell.sh            # auto-detects your current shell
+#   ./setup-i-shell.sh zsh        # force a specific shell
+#   ./setup-i-shell.sh bash
+#   ./setup-i-shell.sh fish
 #
 # Safe to re-run: checks before installing/appending anything.
 

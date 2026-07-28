@@ -1,6 +1,6 @@
-# Intelligent Terminal
+# I-Shell
 
-A single script that upgrades your terminal with modern IDE-like features — inline autosuggestions, syntax highlighting, fuzzy history search, smart completions — for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew) and **Debian/Ubuntu/Kali** (apt). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
+**I-Shell** (short for *Intelligent Shell*) is a single script that upgrades your terminal with modern IDE-like features — inline autosuggestions, syntax highlighting, fuzzy history search, smart completions — for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew) and **Debian/Ubuntu/Kali** (apt). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
 
 Safe to re-run — it checks before installing or appending anything.
 
@@ -26,14 +26,14 @@ Optional add-ons:
 ## Usage
 
 ```bash
-git clone https://github.com/nightowl0077/Inteligent-Terminal.git
-cd Inteligent-Terminal
-chmod +x setup-shell-intellisense.sh
+git clone https://github.com/nightowl0077/I-Shell.git
+cd I-Shell
+chmod +x setup-i-shell.sh
 
-./setup-shell-intellisense.sh          # auto-detects your current shell
-./setup-shell-intellisense.sh zsh      # or force one
-./setup-shell-intellisense.sh bash
-./setup-shell-intellisense.sh fish
+./setup-i-shell.sh          # auto-detects your current shell
+./setup-i-shell.sh zsh      # or force one
+./setup-i-shell.sh bash
+./setup-i-shell.sh fish
 ```
 
 The script will:
@@ -66,12 +66,12 @@ Every append is guarded by a marker check, so re-running the script is idempoten
 Run the companion script — it reverses everything the installer did:
 
 ```bash
-chmod +x uninstall-shell-intellisense.sh
+chmod +x uninstall-i-shell.sh
 
-./uninstall-shell-intellisense.sh          # auto-detects your current shell
-./uninstall-shell-intellisense.sh zsh      # or force one
-./uninstall-shell-intellisense.sh bash
-./uninstall-shell-intellisense.sh fish
+./uninstall-i-shell.sh          # auto-detects your current shell
+./uninstall-i-shell.sh zsh      # or force one
+./uninstall-i-shell.sh bash
+./uninstall-i-shell.sh fish
 ```
 
 It will:
