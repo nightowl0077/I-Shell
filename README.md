@@ -2,7 +2,7 @@
 
 **I-Shell** (short for *Intelligent Shell*) is a single script that upgrades your terminal with modern IDE-like features — inline autosuggestions, syntax highlighting, fuzzy history search, smart completions — for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew) and **Debian/Ubuntu/Kali** (apt). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
 
-Safe to re-run — it checks before installing or appending anything.
+Safe to re-run — every step checks before installing, appending, or removing.
 
 ## What you get
 
@@ -25,23 +25,85 @@ Optional add-ons:
 
 ## Usage
 
+One script handles both install and uninstall:
+
 ```bash
 git clone https://github.com/nightowl0077/I-Shell.git
 cd I-Shell
-chmod +x setup-i-shell.sh
+chmod +x i-shell.sh
 
-./setup-i-shell.sh          # auto-detects your current shell
-./setup-i-shell.sh zsh      # or force one
-./setup-i-shell.sh bash
-./setup-i-shell.sh fish
+# --- install ---
+./i-shell.sh                    # install for your current shell
+./i-shell.sh install            # same as above
+./i-shell.sh install zsh        # install for a specific shell (zsh|bash|fish)
+
+# --- uninstall ---
+./i-shell.sh uninstall          # uninstall for your current shell
+./i-shell.sh uninstall bash     # uninstall for a specific shell
+
+./i-shell.sh --help             # print usage
 ```
 
-The script will:
+The installer will:
 1. Detect your shell and package manager.
 2. Install the plugins/tools listed above.
 3. Append `source` lines to your shell rc file (only if not already present).
 4. Ask whether to install Ghostty and, if yes, walk you through visual customization.
 5. Reload your shell so the new features are live immediately.
+
+The uninstaller will:
+1. Strip the `source` / `eval` lines it added (a timestamped backup is saved as `<rcfile>.i-shell-bak.<epoch>` first).
+2. Ask before uninstalling each package group (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `bash-completion`, `fzf`, `fish`).
+3. Ask before deleting `~/.local/share/blesh` (the ble.sh install).
+4. Ask before removing Starship (whether from your package manager or the community installer).
+5. Ask before removing Ghostty; if you previously had a Ghostty config, offer to restore it from the newest `~/.config/ghostty/config.bak.*` backup.
+
+Every uninstall step is opt-in, so you can drop things selectively (e.g. keep fzf but remove everything else).
+
+## Keyboard shortcuts
+
+The whole point of installing this stuff is these shortcuts.
+
+### fzf — fuzzy pickers (all shells)
+
+| Shortcut | What it does |
+|---|---|
+| `Ctrl-R` | Fuzzy-search your command **history**. Type any substring, hit Enter to run. |
+| `Ctrl-T` | Fuzzy-search **files** under the current directory and paste the picked path into your command line. |
+| `Alt-C` (macOS: `Esc-C` or `Option-C`) | Fuzzy-search **subdirectories** and `cd` into the one you pick. |
+
+Inside any fzf picker: type to filter, `↑`/`↓` to move, `Enter` to accept, `Esc` to cancel, `Tab` to multi-select.
+
+### Autosuggestions — the greyed-out ghost text
+
+Applies to zsh (`zsh-autosuggestions`), bash (`ble.sh`), and fish (built-in). Suggestions come from your history and directory context.
+
+| Shortcut | What it does |
+|---|---|
+| `→` (right arrow, cursor at end of line) | Accept the **whole** suggestion |
+| `Ctrl-E` | Accept and jump to end of line |
+| `Alt-F` / `Esc-F` | Accept just the **next word** of the suggestion |
+| `Ctrl-U` | Clear the current line (dismisses the suggestion) |
+
+### Completions
+
+| Shortcut | What it does |
+|---|---|
+| `Tab` | Trigger completion or cycle through matches |
+| `Tab Tab` (zsh) | Show the full menu of matches |
+| `Shift-Tab` (zsh menu) | Cycle backwards through matches |
+
+Tab now completes flags, subcommands, git branches, remote hosts, package names, and more — driven by `zsh-completions` / `bash-completion` / fish's built-in system.
+
+### Line editing (built-in but worth remembering)
+
+| Shortcut | What it does |
+|---|---|
+| `Ctrl-A` / `Ctrl-E` | Jump to start / end of line |
+| `Alt-B` / `Alt-F` | Move back / forward one word |
+| `Ctrl-W` | Delete previous word |
+| `Ctrl-U` / `Ctrl-K` | Delete to start / end of line |
+| `Ctrl-L` | Clear the screen |
 
 ## What it edits
 
@@ -58,30 +120,9 @@ Every append is guarded by a marker check, so re-running the script is idempoten
 
 - **bash** has no first-class equivalent to `zsh-autosuggestions`, so the script installs [ble.sh](https://github.com/akinomyoga/ble.sh), which provides both autosuggestions and syntax highlighting. First install takes a minute (git clone + `make`).
 - **fish** ships with autosuggestions and highlighting out of the box, so its setup is the shortest.
-- **Ghostty on Debian/Ubuntu/Kali**: apt only carries Ghostty on Ubuntu 26.04+. On older releases the script falls back to the community `.deb` installer from [mkasberg/ghostty-ubuntu](https://github.com/mkasberg/ghostty-ubuntu).
+- **Ghostty on Debian/Ubuntu/Kali**: apt only carries Ghostty on Ubuntu 26.04+. On older releases the script offers to download the community `.deb` installer from [mkasberg/ghostty-ubuntu](https://github.com/mkasberg/ghostty-ubuntu) to a temp file so you can inspect it before running.
+- Same pattern for the Starship fallback installer — it's downloaded to a temp file, then run only after you confirm. No blind `curl | bash`.
 - If `compaudit` reports insecure zsh directories, the script fixes their permissions automatically.
-
-## Uninstall
-
-Run the companion script — it reverses everything the installer did:
-
-```bash
-chmod +x uninstall-i-shell.sh
-
-./uninstall-i-shell.sh          # auto-detects your current shell
-./uninstall-i-shell.sh zsh      # or force one
-./uninstall-i-shell.sh bash
-./uninstall-i-shell.sh fish
-```
-
-It will:
-1. Strip the `source` / `eval` lines added to your shell rc file (a timestamped backup is saved as `<rcfile>.uninstall-bak.<epoch>` first).
-2. Ask before uninstalling each set of packages (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `bash-completion`, `fzf`, `fish`).
-3. Ask before deleting `~/.local/share/blesh` (the ble.sh install).
-4. Ask before removing Starship (whether it came from your package manager or the `curl | sh` installer).
-5. Ask before removing Ghostty; if you previously had a Ghostty config, offer to restore it from the newest `~/.config/ghostty/config.bak.*` backup.
-
-Every step is opt-in, so you can uninstall selectively (e.g. keep fzf but drop everything else).
 
 ## License
 

@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 #
-# setup-i-shell.sh  (I-Shell = Intelligent Shell)
+# i-shell.sh  (I-Shell = Intelligent Shell)
 #
-# Sets up autosuggestions + syntax highlighting + fuzzy search + completions
-# for zsh, bash, or fish — on macOS (Homebrew) or Linux (apt).
+# One script, two actions:
+#   install    Adds autosuggestions, syntax highlighting, fuzzy search, and
+#              completions to zsh / bash / fish. Optionally installs Ghostty
+#              and a git-aware Starship prompt.
+#   uninstall  Reverses everything install did (rc lines, packages, ble.sh,
+#              Starship, Ghostty). Every step is opt-in.
 #
 # Usage:
-#   ./setup-i-shell.sh            # auto-detects your current shell
-#   ./setup-i-shell.sh zsh        # force a specific shell
-#   ./setup-i-shell.sh bash
-#   ./setup-i-shell.sh fish
+#   ./i-shell.sh                          # install, auto-detect current shell
+#   ./i-shell.sh install                  # same as above
+#   ./i-shell.sh install zsh              # install and force a specific shell
+#   ./i-shell.sh uninstall                # uninstall for current shell
+#   ./i-shell.sh uninstall bash           # uninstall and force a specific shell
 #
-# Safe to re-run: checks before installing/appending anything.
+# Safe to re-run: every step checks before installing, appending, or removing.
 
 set -e
 
@@ -20,7 +25,21 @@ info()  { echo -e "${GREEN}[OK]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[..]${NC} $1"; }
 fail()  { echo -e "${RED}[FAIL]${NC} $1"; exit 1; }
 
-# ---------- Step 0: figure out target shell ----------
+ask_yes_no() {
+  local prompt="$1" answer
+  read -r -p "$prompt [y/N]: " answer
+  [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+# ---------- Arg parsing: [install|uninstall] [zsh|bash|fish] ----------
+ACTION="install"
+case "$1" in
+  install|uninstall) ACTION="$1"; shift ;;
+  -h|--help|help)
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0 ;;
+esac
+
 TARGET_SHELL="$1"
 if [ -z "$TARGET_SHELL" ]; then
   TARGET_SHELL="$(basename "$SHELL")"
@@ -28,34 +47,52 @@ if [ -z "$TARGET_SHELL" ]; then
 fi
 
 case "$TARGET_SHELL" in
-  zsh|bash|fish) info "Target shell: $TARGET_SHELL" ;;
+  zsh|bash|fish) info "Action: $ACTION   Target shell: $TARGET_SHELL" ;;
   *) fail "Unsupported shell '$TARGET_SHELL'. Use zsh, bash, or fish." ;;
 esac
 
-# ---------- Step 0b: figure out package manager ----------
+# ---------- Package manager detection ----------
 if command -v brew >/dev/null 2>&1; then
   PKG_MGR="brew"
   PKG_INSTALL="brew install"
+  PKG_UNINSTALL="brew uninstall"
   PKG_PREFIX="$(brew --prefix)"
 elif command -v apt >/dev/null 2>&1; then
   PKG_MGR="apt"
   PKG_INSTALL="sudo apt install -y"
+  PKG_UNINSTALL="sudo apt remove -y"
   PKG_PREFIX="/usr"
 else
-  fail "Neither Homebrew nor apt found. This script supports macOS (brew) and Debian/Ubuntu/Kali (apt) only."
+  if [ "$ACTION" = "install" ]; then
+    fail "Neither Homebrew nor apt found. This script supports macOS (brew) and Debian/Ubuntu/Kali (apt) only."
+  fi
+  PKG_MGR="none"
+  warn "Neither Homebrew nor apt found — uninstall will only clean rc files, not remove packages."
 fi
-info "Package manager: $PKG_MGR"
+[ "$PKG_MGR" != "none" ] && info "Package manager: $PKG_MGR"
+
+pkg_installed() {
+  local pkg="$1"
+  case "$PKG_MGR" in
+    brew) brew list "$pkg" >/dev/null 2>&1 ;;
+    apt)  dpkg -s "$pkg" >/dev/null 2>&1 ;;
+    *)    return 1 ;;
+  esac
+}
 
 install_pkg() {
   local pkg="$1"
-  if [ "$PKG_MGR" = "brew" ]; then
-    brew list "$pkg" >/dev/null 2>&1 && { info "$pkg already installed"; return; }
-  else
-    dpkg -s "$pkg" >/dev/null 2>&1 && { info "$pkg already installed"; return; }
-  fi
+  pkg_installed "$pkg" && { info "$pkg already installed"; return; }
   warn "Installing $pkg..."
   $PKG_INSTALL "$pkg" || fail "Failed to install $pkg"
   info "$pkg installed"
+}
+
+uninstall_pkg() {
+  local pkg="$1"
+  pkg_installed "$pkg" || { info "$pkg not installed, skipping"; return; }
+  warn "Removing $pkg..."
+  $PKG_UNINSTALL "$pkg" || warn "Failed to remove $pkg (continuing)"
 }
 
 add_line_if_missing() {
@@ -68,10 +105,37 @@ add_line_if_missing() {
   fi
 }
 
+# Backs up rc file, then strips lines matching the given extended regex.
+# Also drops a "# --- xxx ---" header (and one blank line above it) that
+# immediately precedes the matched line, so blocks go cleanly.
+strip_from_rc() {
+  local rcfile="$1" pattern="$2"
+  [ -f "$rcfile" ] || return 0
+  grep -Eq "$pattern" "$rcfile" 2>/dev/null || return 0
+
+  cp "$rcfile" "$rcfile.i-shell-bak.$(date +%s)"
+  awk -v pat="$pattern" '
+    { lines[NR] = $0 }
+    END {
+      for (i = 1; i <= NR; i++) {
+        if (lines[i] ~ pat) {
+          skip[i] = 1
+          if (i-1 >= 1 && lines[i-1] ~ /^# --- .* ---$/) {
+            skip[i-1] = 1
+            if (i-2 >= 1 && lines[i-2] ~ /^[[:space:]]*$/) skip[i-2] = 1
+          }
+        }
+      }
+      for (i = 1; i <= NR; i++) if (!skip[i]) print lines[i]
+    }
+  ' "$rcfile" > "$rcfile.tmp" && mv "$rcfile.tmp" "$rcfile"
+  info "Cleaned '$pattern' from $(basename "$rcfile")"
+}
+
 # =====================================================================
-# ZSH
+# INSTALL — ZSH
 # =====================================================================
-setup_zsh() {
+install_zsh() {
   local ZSHRC="$HOME/.zshrc"
   touch "$ZSHRC"
 
@@ -88,7 +152,7 @@ setup_zsh() {
     done
     local SUGGEST="/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
     local HIGHLIGHT="/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-    local COMP_DIR=""  # Debian ships zsh completions in the default fpath already
+    local COMP_DIR=""
   fi
 
   echo "== fzf key bindings =="
@@ -134,14 +198,14 @@ source $HIGHLIGHT"
   grep -qF "zsh-autosuggestions" "$ZSHRC" && info "autosuggestions referenced in .zshrc"
   grep -qF "zsh-syntax-highlighting" "$ZSHRC" && info "syntax-highlighting referenced in .zshrc"
 
-  echo -e "${GREEN}zsh setup complete.${NC} Reloading..."
+  echo -e "${GREEN}zsh install complete.${NC} Reloading..."
   exec zsh -l
 }
 
 # =====================================================================
-# BASH
+# INSTALL — BASH
 # =====================================================================
-setup_bash() {
+install_bash() {
   local BASHRC="$HOME/.bashrc"
   touch "$BASHRC"
 
@@ -165,8 +229,6 @@ setup_bash() {
   fi
 
   echo "== Installing ble.sh (autosuggestions + syntax highlighting for bash) =="
-  # bash has no equivalent to zsh-autosuggestions as a simple package;
-  # ble.sh (Bash Line Editor) is the standard tool that provides both.
   local BLESH_DIR="$HOME/.local/share/blesh"
   if [ -f "$BLESH_DIR/ble.sh" ]; then
     info "ble.sh already installed"
@@ -183,9 +245,7 @@ setup_bash() {
   fi
 
   echo "== Updating ~/.bashrc =="
-  # ble.sh must be sourced near the TOP of .bashrc (before other init)
   if ! grep -qF "blesh/ble.sh" "$BASHRC"; then
-    # prepend rather than append
     { echo "[[ \$- == *i* ]] && source \"$BLESH_DIR/ble.sh\" --noattach"; cat "$BASHRC"; } > "$BASHRC.tmp"
     mv "$BASHRC.tmp" "$BASHRC"
     info "Prepended ble.sh init to .bashrc"
@@ -199,14 +259,14 @@ setup_bash() {
   [ -f "$BLESH_DIR/ble.sh" ] && info "ble.sh present" || fail "ble.sh missing"
   grep -qF "blesh/ble.sh" "$BASHRC" && info "ble.sh referenced in .bashrc"
 
-  echo -e "${GREEN}bash setup complete.${NC} Reloading..."
+  echo -e "${GREEN}bash install complete.${NC} Reloading..."
   exec bash -l
 }
 
 # =====================================================================
-# FISH
+# INSTALL — FISH
 # =====================================================================
-setup_fish() {
+install_fish() {
   install_pkg "fish"
   install_pkg "fzf"
 
@@ -229,21 +289,15 @@ fzf_key_bindings"
   echo "== Validating =="
   command -v fish >/dev/null 2>&1 && info "fish installed" || fail "fish not found after install"
 
-  echo -e "${GREEN}fish setup complete.${NC}"
+  echo -e "${GREEN}fish install complete.${NC}"
   warn "To make fish your default shell: chsh -s \$(which fish)"
   echo "Launching a fish session now..."
   exec fish
 }
 
 # =====================================================================
-# GHOSTTY (optional)
+# INSTALL — GHOSTTY (optional)
 # =====================================================================
-ask_yes_no() {
-  local prompt="$1" answer
-  read -r -p "$prompt [y/N]: " answer
-  [[ "$answer" =~ ^[Yy]$ ]]
-}
-
 install_ghostty() {
   if command -v ghostty >/dev/null 2>&1; then
     info "Ghostty already installed"
@@ -254,15 +308,22 @@ install_ghostty() {
     warn "Installing Ghostty via Homebrew cask..."
     brew install --cask ghostty || fail "Ghostty install failed"
   else
-    # Debian/Ubuntu/Kali: try apt first (native package only on Ubuntu 26.04+),
-    # fall back to the community-maintained installer if apt doesn't have it.
     if apt list --installable 2>/dev/null | grep -q '^ghostty/'; then
       warn "Installing Ghostty via apt..."
       sudo apt install -y ghostty || fail "Ghostty install failed"
     else
-      warn "Ghostty isn't in this distro's apt repos yet — using the community .deb installer (mkasberg/ghostty-ubuntu)..."
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)" \
-        || fail "Ghostty community installer failed. See https://github.com/mkasberg/ghostty-ubuntu for manual steps."
+      local INSTALLER_URL="https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh"
+      warn "Ghostty isn't in this distro's apt repos yet — the community installer is at:"
+      warn "  $INSTALLER_URL"
+      ask_yes_no "Download it to a temp file so you can inspect, then run it?" \
+        || fail "Skipped Ghostty install. See https://github.com/mkasberg/ghostty-ubuntu for manual steps."
+      local INSTALLER_TMP
+      INSTALLER_TMP=$(mktemp -t ghostty-install.XXXXXX.sh)
+      curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TMP" || fail "Failed to download installer"
+      info "Downloaded to $INSTALLER_TMP — inspect it in another terminal if you like."
+      ask_yes_no "Run $INSTALLER_TMP now?" || { rm -f "$INSTALLER_TMP"; fail "Skipped Ghostty install."; }
+      bash "$INSTALLER_TMP" || { rm -f "$INSTALLER_TMP"; fail "Ghostty community installer failed."; }
+      rm -f "$INSTALLER_TMP"
     fi
   fi
 
@@ -317,7 +378,19 @@ background-blur = true"
   fi
 
   if ask_yes_no "Add a git-aware prompt (shows branch/status) via Starship — works in zsh/bash/fish?"; then
-    install_pkg "starship" 2>/dev/null || { warn "Installing starship via its official script..."; curl -sS https://starship.rs/install.sh | sh -s -- -y || fail "starship install failed"; }
+    if ! install_pkg "starship" 2>/dev/null; then
+      local SS_URL="https://starship.rs/install.sh"
+      warn "starship isn't packaged here — the official installer is at $SS_URL"
+      ask_yes_no "Download it to a temp file so you can inspect, then run it?" \
+        || fail "Skipped starship install."
+      local SS_TMP
+      SS_TMP=$(mktemp -t starship-install.XXXXXX.sh)
+      curl -fsSL "$SS_URL" -o "$SS_TMP" || fail "Failed to download starship installer"
+      info "Downloaded to $SS_TMP — inspect it if you like."
+      ask_yes_no "Run $SS_TMP now?" || { rm -f "$SS_TMP"; fail "Skipped starship install."; }
+      sh "$SS_TMP" -- -y || { rm -f "$SS_TMP"; fail "starship install failed"; }
+      rm -f "$SS_TMP"
+    fi
     case "$TARGET_SHELL" in
       zsh)  add_line_if_missing "$HOME/.zshrc" 'starship init zsh' 'eval "$(starship init zsh)"' ;;
       bash) add_line_if_missing "$HOME/.bashrc" 'starship init bash' 'eval "$(starship init bash)"' ;;
@@ -332,17 +405,153 @@ background-blur = true"
   cat "$GHOSTTY_CONF"
 }
 
-echo ""
-if ask_yes_no "Would you like to install Ghostty (GPU-accelerated terminal)?"; then
-  install_ghostty
-  if ask_yes_no "Customize Ghostty's visuals now (theme, font, git-aware prompt)?"; then
-    configure_ghostty
-  fi
-fi
+# =====================================================================
+# UNINSTALL — ZSH / BASH / FISH
+# =====================================================================
+uninstall_zsh() {
+  local ZSHRC="$HOME/.zshrc"
 
-# ---------- dispatch ----------
-case "$TARGET_SHELL" in
-  zsh)  setup_zsh ;;
-  bash) setup_bash ;;
-  fish) setup_fish ;;
-esac
+  echo "== Cleaning ~/.zshrc =="
+  strip_from_rc "$ZSHRC" 'zsh-autosuggestions\.zsh'
+  strip_from_rc "$ZSHRC" 'zsh-syntax-highlighting\.zsh'
+  strip_from_rc "$ZSHRC" '^FPATH=.*zsh-completions'
+  strip_from_rc "$ZSHRC" '^autoload -Uz compinit$'
+  strip_from_rc "$ZSHRC" '^compinit$'
+  strip_from_rc "$ZSHRC" 'starship init zsh'
+
+  if [ "$PKG_MGR" != "none" ] && ask_yes_no "Uninstall zsh plugin packages (zsh-autosuggestions, zsh-syntax-highlighting, zsh-completions, fzf)?"; then
+    for pkg in zsh-autosuggestions zsh-syntax-highlighting zsh-completions fzf; do
+      uninstall_pkg "$pkg"
+    done
+  fi
+}
+
+uninstall_bash() {
+  local BASHRC="$HOME/.bashrc"
+
+  echo "== Cleaning ~/.bashrc =="
+  strip_from_rc "$BASHRC" 'blesh/ble\.sh'
+  strip_from_rc "$BASHRC" 'ble-attach'
+  strip_from_rc "$BASHRC" 'bash_completion\.sh'
+  strip_from_rc "$BASHRC" 'key-bindings\.bash'
+  strip_from_rc "$BASHRC" 'starship init bash'
+
+  local BLESH_DIR="$HOME/.local/share/blesh"
+  if [ -d "$BLESH_DIR" ] && ask_yes_no "Delete ble.sh install at $BLESH_DIR?"; then
+    rm -rf "$BLESH_DIR"
+    info "Removed $BLESH_DIR"
+  fi
+
+  if [ "$PKG_MGR" != "none" ] && ask_yes_no "Uninstall bash packages (bash-completion, fzf)?"; then
+    if [ "$PKG_MGR" = "brew" ]; then
+      uninstall_pkg "bash-completion@2"
+    else
+      uninstall_pkg "bash-completion"
+    fi
+    uninstall_pkg "fzf"
+  fi
+}
+
+uninstall_fish() {
+  local FISH_CONF="$HOME/.config/fish/config.fish"
+
+  echo "== Cleaning config.fish =="
+  strip_from_rc "$FISH_CONF" 'fzf_key_bindings'
+  strip_from_rc "$FISH_CONF" 'key-bindings\.fish'
+  strip_from_rc "$FISH_CONF" 'starship init fish'
+
+  if [ "$PKG_MGR" != "none" ] && ask_yes_no "Uninstall fzf?"; then
+    uninstall_pkg "fzf"
+  fi
+  if [ "$PKG_MGR" != "none" ] && ask_yes_no "Uninstall the fish shell itself?"; then
+    uninstall_pkg "fish"
+  fi
+}
+
+uninstall_ghostty() {
+  local GHOSTTY_DIR="$HOME/.config/ghostty"
+  local GHOSTTY_CONF="$GHOSTTY_DIR/config"
+
+  if [ -f "$GHOSTTY_CONF" ]; then
+    local LATEST_BAK
+    LATEST_BAK=$(ls -t "$GHOSTTY_CONF".bak.* 2>/dev/null | head -n1 || true)
+    if [ -n "$LATEST_BAK" ] && ask_yes_no "Restore Ghostty config from backup $(basename "$LATEST_BAK")?"; then
+      mv "$LATEST_BAK" "$GHOSTTY_CONF"
+      info "Restored $GHOSTTY_CONF from backup"
+    elif ask_yes_no "Delete Ghostty config file $GHOSTTY_CONF?"; then
+      rm -f "$GHOSTTY_CONF"
+      info "Removed $GHOSTTY_CONF"
+    fi
+  fi
+
+  if command -v ghostty >/dev/null 2>&1 && ask_yes_no "Uninstall the Ghostty application?"; then
+    if [ "$PKG_MGR" = "brew" ]; then
+      brew uninstall --cask ghostty 2>/dev/null || warn "brew uninstall failed — remove Ghostty manually if it was installed another way."
+    elif [ "$PKG_MGR" = "apt" ] && dpkg -s ghostty >/dev/null 2>&1; then
+      sudo apt remove -y ghostty || warn "apt remove failed"
+    else
+      warn "Ghostty wasn't installed via a known package manager — remove it manually."
+    fi
+  fi
+}
+
+uninstall_starship() {
+  command -v starship >/dev/null 2>&1 || return 0
+  ask_yes_no "Uninstall Starship prompt?" || return 0
+  if [ "$PKG_MGR" = "brew" ] && brew list starship >/dev/null 2>&1; then
+    brew uninstall starship
+  elif [ "$PKG_MGR" = "apt" ] && dpkg -s starship >/dev/null 2>&1; then
+    sudo apt remove -y starship
+  else
+    local STARSHIP_BIN
+    STARSHIP_BIN=$(command -v starship)
+    warn "Starship was installed outside a package manager. Removing $STARSHIP_BIN..."
+    if [ -w "$STARSHIP_BIN" ]; then
+      rm -f "$STARSHIP_BIN"
+    else
+      sudo rm -f "$STARSHIP_BIN"
+    fi
+  fi
+  info "Starship removed"
+}
+
+# =====================================================================
+# DISPATCH
+# =====================================================================
+if [ "$ACTION" = "install" ]; then
+  echo ""
+  if ask_yes_no "Would you like to install Ghostty (GPU-accelerated terminal)?"; then
+    install_ghostty
+    if ask_yes_no "Customize Ghostty's visuals now (theme, font, git-aware prompt)?"; then
+      configure_ghostty
+    fi
+  fi
+
+  case "$TARGET_SHELL" in
+    zsh)  install_zsh ;;
+    bash) install_bash ;;
+    fish) install_fish ;;
+  esac
+
+else  # uninstall
+  echo ""
+  warn "This will remove I-Shell's changes from your shell config."
+  warn "A timestamped backup of each rc file will be saved as <rcfile>.i-shell-bak.<epoch>."
+  ask_yes_no "Continue?" || { info "Aborted."; exit 0; }
+
+  case "$TARGET_SHELL" in
+    zsh)  uninstall_zsh ;;
+    bash) uninstall_bash ;;
+    fish) uninstall_fish ;;
+  esac
+
+  echo ""
+  uninstall_starship
+  echo ""
+  if ask_yes_no "Also remove Ghostty and its config?"; then
+    uninstall_ghostty
+  fi
+
+  echo ""
+  info "Done. Open a new terminal to load a clean shell environment."
+fi
