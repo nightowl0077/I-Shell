@@ -61,13 +61,27 @@ Every append is guarded by a marker check, so re-running the script is idempoten
 - **Ghostty on Debian/Ubuntu/Kali**: apt only carries Ghostty on Ubuntu 26.04+. On older releases the script falls back to the community `.deb` installer from [mkasberg/ghostty-ubuntu](https://github.com/mkasberg/ghostty-ubuntu).
 - If `compaudit` reports insecure zsh directories, the script fixes their permissions automatically.
 
-## Uninstall / revert
+## Uninstall
 
-Nothing is installed to unusual locations. To roll back:
-- Remove the blocks appended to your shell rc file (search for `zsh-autosuggestions`, `zsh-syntax-highlighting`, `blesh/ble.sh`, `starship init`, `fzf_key_bindings`).
-- Uninstall the packages via `brew uninstall <name>` or `sudo apt remove <name>`.
-- Delete `~/.local/share/blesh` if you installed ble.sh.
-- Restore your Ghostty config from the `~/.config/ghostty/config.bak.*` backup.
+Run the companion script — it reverses everything the installer did:
+
+```bash
+chmod +x uninstall-shell-intellisense.sh
+
+./uninstall-shell-intellisense.sh          # auto-detects your current shell
+./uninstall-shell-intellisense.sh zsh      # or force one
+./uninstall-shell-intellisense.sh bash
+./uninstall-shell-intellisense.sh fish
+```
+
+It will:
+1. Strip the `source` / `eval` lines added to your shell rc file (a timestamped backup is saved as `<rcfile>.uninstall-bak.<epoch>` first).
+2. Ask before uninstalling each set of packages (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `bash-completion`, `fzf`, `fish`).
+3. Ask before deleting `~/.local/share/blesh` (the ble.sh install).
+4. Ask before removing Starship (whether it came from your package manager or the `curl | sh` installer).
+5. Ask before removing Ghostty; if you previously had a Ghostty config, offer to restore it from the newest `~/.config/ghostty/config.bak.*` backup.
+
+Every step is opt-in, so you can uninstall selectively (e.g. keep fzf but drop everything else).
 
 ## License
 
