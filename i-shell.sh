@@ -97,13 +97,18 @@ pkg_installed() {
   esac
 }
 
-# Print the first path that exists from the args, or nothing.
+# Print the first path that exists from the args, or empty string.
+# Always returns 0 so callers can capture the result under `set -e`
+# without needing `|| true` on every assignment.
 find_first() {
   local p
   for p in "$@"; do
-    [ -e "$p" ] && { echo "$p"; return 0; }
+    if [ -e "$p" ]; then
+      printf '%s' "$p"
+      return 0
+    fi
   done
-  return 1
+  return 0
 }
 
 install_pkg() {
@@ -165,9 +170,13 @@ install_zsh() {
   local ZSHRC="$HOME/.zshrc"
   touch "$ZSHRC"
 
-  # apt doesn't package zsh-completions by default; everyone else does
+  # Only brew ships zsh-completions as a straightforwardly-named separate package.
+  # apt and dnf don't package it; pacman/zypper do but naming varies - the built-in
+  # completions in /usr/share/zsh/site-functions cover the common cases on Linux.
   local zsh_pkgs="zsh-autosuggestions zsh-syntax-highlighting fzf"
-  [ "$PKG_MGR" != "apt" ] && zsh_pkgs="$zsh_pkgs zsh-completions"
+  if [ "$PKG_MGR" = "brew" ]; then
+    zsh_pkgs="$zsh_pkgs zsh-completions"
+  fi
   for pkg in $zsh_pkgs; do install_pkg "$pkg"; done
 
   # Auto-detect installed plugin paths across distros
