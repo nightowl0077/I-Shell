@@ -1,0 +1,5 @@
+.DS_Store
+
+# macOS Finder / iCloud duplicate-name pattern (e.g. "foo 2.sh")
+* [0-9].sh
+* [0-9].md
