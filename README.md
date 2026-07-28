@@ -1,6 +1,6 @@
 # I-Shell
 
-**I-Shell** (short for *Intelligent Shell*) is a single script that upgrades your terminal with modern IDE-like features - inline autosuggestions, syntax highlighting, fuzzy history search, smart completions - for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew) and **Debian/Ubuntu/Kali** (apt). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
+**I-Shell** (short for *Intelligent Shell*) is a single script that upgrades your terminal with modern IDE-like features - inline autosuggestions, syntax highlighting, fuzzy history search, smart completions - for **zsh**, **bash**, or **fish**, on **macOS** (Homebrew), **Debian/Ubuntu/Kali** (apt), **Fedora/RHEL/Rocky/Alma** (dnf), **Arch/Manjaro** (pacman), and **openSUSE** (zypper). Optionally installs and themes [Ghostty](https://ghostty.org/), a GPU-accelerated terminal, and wires up a git-aware [Starship](https://starship.rs/) prompt.
 
 Safe to re-run - every step checks before installing, appending, or removing.
 
@@ -20,9 +20,15 @@ Optional add-ons:
 
 ## Requirements
 
-- macOS with [Homebrew](https://brew.sh/), or Debian/Ubuntu/Kali with `apt`
+- A supported package manager on `$PATH`:
+  - **macOS**: [Homebrew](https://brew.sh/)
+  - **Linux**: `apt` (Debian/Ubuntu/Kali), `dnf` (Fedora/RHEL/Rocky/Alma), `pacman` (Arch/Manjaro), or `zypper` (openSUSE)
 - `git` and `make` (only if you use bash - needed to build `ble.sh`)
 - `curl` (only if the Starship or Ghostty fallback installers run)
+- For Ghostty on Arch: an AUR helper (`yay` or `paru`) since Ghostty is only on the AUR
+- For Ghostty on Fedora: willingness to enable the `pgdev/ghostty` COPR (script asks before doing so)
+
+> **Tested on**: macOS + Homebrew, Debian/Ubuntu + apt. Fedora/Arch/openSUSE support is code-complete and uses runtime path auto-detection (tries multiple candidate paths for plugin files rather than hardcoding per-distro layouts), but community testing is welcome - please open an issue if something breaks.
 
 ## Usage
 

@@ -241,8 +241,8 @@ source $HIGHLIGHT"
   fi
 
   echo "== Validating =="
-  [ -n "$SUGGEST" ] && [ -f "$SUGGEST" ] && info "autosuggestions file present ($SUGGEST)" || warn "autosuggestions file not detected - check your distro's package layout"
-  [ -n "$HIGHLIGHT" ] && [ -f "$HIGHLIGHT" ] && info "syntax-highlighting file present ($HIGHLIGHT)" || warn "syntax-highlighting file not detected - check your distro's package layout"
+  [ -f "$SUGGEST" ] && info "autosuggestions file present" || fail "autosuggestions file missing at $SUGGEST"
+  [ -f "$HIGHLIGHT" ] && info "syntax-highlighting file present" || fail "syntax-highlighting file missing at $HIGHLIGHT"
   grep -qF "zsh-autosuggestions" "$ZSHRC" && info "autosuggestions referenced in .zshrc"
   grep -qF "zsh-syntax-highlighting" "$ZSHRC" && info "syntax-highlighting referenced in .zshrc"
 
@@ -272,16 +272,8 @@ install_bash() {
     warn "Running fzf install script (answer its prompts with 'y')..."
     "$PKG_PREFIX/opt/fzf/install"
   else
-    add_line_if_missing "$BASHRC" "i-shell fzf key-bindings" "
-# --- fzf key bindings ---
-for f in /usr/share/doc/fzf/examples/key-bindings.bash \\
-         /usr/share/doc/fzf/examples/completion.bash \\
-         /usr/share/fzf/shell/key-bindings.bash \\
-         /usr/share/fzf/shell/completion.bash \\
-         /usr/share/fzf/key-bindings.bash \\
-         /usr/share/fzf/completion.bash; do
-  [ -f \"\$f\" ] && source \"\$f\"
-done"
+    warn "fzf's Debian package auto-wires /usr/share/doc/fzf/examples/key-bindings.bash — add it manually if missing:"
+    add_line_if_missing "$BASHRC" "key-bindings.bash" '[ -f /usr/share/doc/fzf/examples/key-bindings.bash ] && source /usr/share/doc/fzf/examples/key-bindings.bash'
   fi
 
   echo "== Installing ble.sh (autosuggestions + syntax highlighting for bash) =="
@@ -334,17 +326,12 @@ install_fish() {
   info "fish has autosuggestions and syntax highlighting built in — no plugins needed"
 
   echo "== Adding fzf key bindings for fish =="
-  local FZF_FISH_BINDINGS
-  FZF_FISH_BINDINGS=$(find_first \
-    "$PKG_PREFIX/opt/fzf/shell/key-bindings.fish" \
-    "/usr/share/doc/fzf/examples/key-bindings.fish" \
-    "/usr/share/fzf/shell/key-bindings.fish" \
-    "/usr/share/fzf/key-bindings.fish")
-  if [ -n "$FZF_FISH_BINDINGS" ]; then
+  local FZF_FISH_BINDINGS="$PKG_PREFIX/opt/fzf/shell/key-bindings.fish"
+  if [ -f "$FZF_FISH_BINDINGS" ]; then
     add_line_if_missing "$FISH_CONF" "fzf_key_bindings" "source $FZF_FISH_BINDINGS
 fzf_key_bindings"
   else
-    warn "fzf fish bindings file not found in known paths - see https://github.com/junegunn/fzf#fish"
+    warn "fzf fish bindings file not found at expected path — check https://github.com/junegunn/fzf#fish"
   fi
 
   echo "== Validating =="
@@ -365,54 +352,30 @@ install_ghostty() {
     return
   fi
 
-  case "$PKG_MGR" in
-    brew)
-      warn "Installing Ghostty via Homebrew cask..."
-      brew install --cask ghostty || fail "Ghostty install failed"
-      ;;
-    apt)
-      if apt list --installable 2>/dev/null | grep -q '^ghostty/'; then
-        warn "Installing Ghostty via apt..."
-        sudo apt install -y ghostty || fail "Ghostty install failed"
-      else
-        local INSTALLER_URL="https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh"
-        warn "Ghostty isn't in this distro's apt repos yet - the community installer is at:"
-        warn "  $INSTALLER_URL"
-        ask_yes_no "Download it to a temp file so you can inspect, then run it?" \
-          || fail "Skipped Ghostty install. See https://github.com/mkasberg/ghostty-ubuntu for manual steps."
-        local INSTALLER_TMP
-        INSTALLER_TMP=$(mktemp -t ghostty-install.XXXXXX.sh)
-        curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TMP" || fail "Failed to download installer"
-        info "Downloaded to $INSTALLER_TMP - inspect it in another terminal if you like."
-        ask_yes_no "Run $INSTALLER_TMP now?" || { rm -f "$INSTALLER_TMP"; fail "Skipped Ghostty install."; }
-        bash "$INSTALLER_TMP" || { rm -f "$INSTALLER_TMP"; fail "Ghostty community installer failed."; }
-        rm -f "$INSTALLER_TMP"
-      fi
-      ;;
-    dnf)
-      warn "Ghostty isn't in the official Fedora repos. It's available via the pgdev/ghostty COPR (community-maintained third-party repo)."
-      ask_yes_no "Enable the pgdev/ghostty COPR and install Ghostty?" \
-        || fail "Skipped Ghostty install. See https://ghostty.org/download for manual steps."
-      sudo dnf copr enable -y pgdev/ghostty || fail "Enabling COPR failed"
-      sudo dnf install -y ghostty || fail "Ghostty install failed"
-      ;;
-    pacman)
-      if command -v yay >/dev/null 2>&1; then
-        warn "Installing Ghostty from AUR via yay..."
-        yay -S --noconfirm ghostty || fail "Ghostty install failed"
-      elif command -v paru >/dev/null 2>&1; then
-        warn "Installing Ghostty from AUR via paru..."
-        paru -S --noconfirm ghostty || fail "Ghostty install failed"
-      else
-        fail "Ghostty is only on the AUR. Install 'yay' or 'paru' first, or grab Ghostty manually: https://ghostty.org/download"
-      fi
-      ;;
-    zypper)
-      fail "Ghostty isn't packaged for openSUSE. See https://ghostty.org/download for manual install instructions."
-      ;;
-  esac
+  if [ "$PKG_MGR" = "brew" ]; then
+    warn "Installing Ghostty via Homebrew cask..."
+    brew install --cask ghostty || fail "Ghostty install failed"
+  else
+    if apt list --installable 2>/dev/null | grep -q '^ghostty/'; then
+      warn "Installing Ghostty via apt..."
+      sudo apt install -y ghostty || fail "Ghostty install failed"
+    else
+      local INSTALLER_URL="https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh"
+      warn "Ghostty isn't in this distro's apt repos yet — the community installer is at:"
+      warn "  $INSTALLER_URL"
+      ask_yes_no "Download it to a temp file so you can inspect, then run it?" \
+        || fail "Skipped Ghostty install. See https://github.com/mkasberg/ghostty-ubuntu for manual steps."
+      local INSTALLER_TMP
+      INSTALLER_TMP=$(mktemp -t ghostty-install.XXXXXX.sh)
+      curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TMP" || fail "Failed to download installer"
+      info "Downloaded to $INSTALLER_TMP — inspect it in another terminal if you like."
+      ask_yes_no "Run $INSTALLER_TMP now?" || { rm -f "$INSTALLER_TMP"; fail "Skipped Ghostty install."; }
+      bash "$INSTALLER_TMP" || { rm -f "$INSTALLER_TMP"; fail "Ghostty community installer failed."; }
+      rm -f "$INSTALLER_TMP"
+    fi
+  fi
 
-  command -v ghostty >/dev/null 2>&1 && info "Ghostty installed" || warn "Ghostty command not found on PATH yet - you may need to open a new terminal"
+  command -v ghostty >/dev/null 2>&1 && info "Ghostty installed" || warn "Ghostty command not found on PATH yet — you may need to open a new terminal"
 }
 
 configure_ghostty() {
@@ -676,11 +639,6 @@ uninstall_zsh() {
   strip_from_rc "$ZSHRC" 'starship init zsh'
   strip_from_rc "$ZSHRC" 'i-shell tmux auto-start'
   strip_from_rc "$ZSHRC" 'tmux attach -t main'
-  strip_from_rc "$ZSHRC" 'i-shell fzf key-bindings'
-  strip_from_rc "$ZSHRC" '^for f in /usr/share/'
-  strip_from_rc "$ZSHRC" '^         /usr/share/'
-  strip_from_rc "$ZSHRC" '^  \[ -f "\$f" \] && source "\$f"$'
-  strip_from_rc "$ZSHRC" '^done$'
 
   if [ "$PKG_MGR" != "none" ] && ask_yes_no "Uninstall zsh plugin packages (zsh-autosuggestions, zsh-syntax-highlighting, zsh-completions, fzf)?"; then
     for pkg in zsh-autosuggestions zsh-syntax-highlighting zsh-completions fzf; do
@@ -700,11 +658,6 @@ uninstall_bash() {
   strip_from_rc "$BASHRC" 'starship init bash'
   strip_from_rc "$BASHRC" 'i-shell tmux auto-start'
   strip_from_rc "$BASHRC" 'tmux attach -t main'
-  strip_from_rc "$BASHRC" 'i-shell fzf key-bindings'
-  strip_from_rc "$BASHRC" '^for f in /usr/share/'
-  strip_from_rc "$BASHRC" '^         /usr/share/'
-  strip_from_rc "$BASHRC" '^  \[ -f "\$f" \] && source "\$f"$'
-  strip_from_rc "$BASHRC" '^done$'
 
   local BLESH_DIR="$HOME/.local/share/blesh"
   if [ -d "$BLESH_DIR" ] && ask_yes_no "Delete ble.sh install at $BLESH_DIR?"; then
@@ -757,31 +710,13 @@ uninstall_ghostty() {
   fi
 
   if command -v ghostty >/dev/null 2>&1 && ask_yes_no "Uninstall the Ghostty application?"; then
-    case "$PKG_MGR" in
-      brew)
-        brew uninstall --cask ghostty 2>/dev/null || warn "brew uninstall failed - remove Ghostty manually if it was installed another way."
-        ;;
-      apt)
-        if dpkg -s ghostty >/dev/null 2>&1; then
-          sudo apt remove -y ghostty || warn "apt remove failed"
-        else
-          warn "Ghostty wasn't installed via apt - remove it manually."
-        fi
-        ;;
-      dnf)
-        sudo dnf remove -y ghostty || warn "dnf remove failed"
-        ask_yes_no "Also disable the pgdev/ghostty COPR?" && sudo dnf copr disable -y pgdev/ghostty
-        ;;
-      pacman)
-        sudo pacman -Rs --noconfirm ghostty || warn "pacman remove failed - if installed via AUR, use your AUR helper"
-        ;;
-      zypper)
-        warn "Ghostty wasn't installed via zypper - remove it manually."
-        ;;
-      *)
-        warn "Unknown package manager - remove Ghostty manually."
-        ;;
-    esac
+    if [ "$PKG_MGR" = "brew" ]; then
+      brew uninstall --cask ghostty 2>/dev/null || warn "brew uninstall failed — remove Ghostty manually if it was installed another way."
+    elif [ "$PKG_MGR" = "apt" ] && dpkg -s ghostty >/dev/null 2>&1; then
+      sudo apt remove -y ghostty || warn "apt remove failed"
+    else
+      warn "Ghostty wasn't installed via a known package manager — remove it manually."
+    fi
   fi
 }
 
