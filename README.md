@@ -16,6 +16,7 @@ Safe to re-run - every step checks before installing, appending, or removing.
 Optional add-ons:
 - **Ghostty** terminal with a picker for theme (Catppuccin Mocha, Dracula, Nord, Gruvbox Dark, GitHub Dark), font family/size, and background transparency + blur.
 - **Starship** prompt with git branch/status indicators.
+- **tmux shortcut trainer mode** - installs tmux with a minimal always-visible bottom bar that rotates through a shortcut hint every 10 seconds (one tip at a time). Auto-starts in every terminal, only in Ghostty, or manually - your choice at install time. Prefix key, split keys, and vim-nav are all configurable.
 
 ## Requirements
 
@@ -95,6 +96,27 @@ Applies to zsh (`zsh-autosuggestions`), bash (`ble.sh`), and fish (built-in). Su
 
 Tab now completes flags, subcommands, git branches, remote hosts, package names, and more - driven by `zsh-completions` / `bash-completion` / fish's built-in system.
 
+### tmux (if you enabled trainer mode)
+
+All shortcuts are preceded by the **prefix key** (`Ctrl-B` by default; you can pick `Ctrl-A` or `Ctrl-Space` at install time). Split keys default to `%` / `"` but can be swapped for the more mnemonic `|` / `-`.
+
+| Shortcut | What it does |
+|---|---|
+| `prefix %` | Split pane vertically (side by side) |
+| `prefix "` | Split pane horizontally (top / bottom) |
+| `prefix ←→↑↓` | Move between panes |
+| `prefix x` | Close the current pane |
+| `prefix z` | Zoom pane to fullscreen (toggle) |
+| `prefix c` | Create a new window |
+| `prefix n` / `prefix p` | Next / previous window |
+| `prefix ,` | Rename the current window |
+| `prefix d` | Detach (session keeps running in the background - `tmux attach` to return) |
+| `prefix [` | Enter scroll / copy mode (`q` to exit) |
+| `prefix ?` | Show all keybindings |
+| `prefix r` | Reload `~/.tmux.conf` |
+
+The bottom bar rotates through these hints one at a time, so you don't have to memorize them all up front - one lands in front of your eyes every ~10 seconds until muscle memory takes over.
+
 ### Line editing (built-in but worth remembering)
 
 | Shortcut | What it does |
@@ -113,6 +135,7 @@ Tab now completes flags, subcommands, git branches, remote hosts, package names,
 | bash | `~/.bashrc` (ble.sh init is **prepended**, since it must load early) |
 | fish | `~/.config/fish/config.fish` |
 | Ghostty | `~/.config/ghostty/config` (existing config is backed up to `config.bak.<timestamp>`) |
+| tmux (trainer mode) | `~/.tmux.conf` (existing config is backed up to `~/.tmux.conf.i-shell-bak.<timestamp>`) and `~/.config/i-shell/tmux-tip.sh` (the rotating-tip script) |
 
 Every append is guarded by a marker check, so re-running the script is idempotent.
 
