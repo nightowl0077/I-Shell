@@ -170,6 +170,10 @@ install_zsh() {
   local ZSHRC="$HOME/.zshrc"
   touch "$ZSHRC"
 
+  # Install zsh itself first - most distros pull it as a dep of zsh-autosuggestions,
+  # but we shouldn't rely on that (openSUSE uses git-clone fallback below).
+  install_pkg "zsh"
+
   # Only brew ships zsh-completions as a straightforwardly-named separate package.
   # apt and dnf don't package it; pacman/zypper do but naming varies - the built-in
   # completions in /usr/share/zsh/site-functions cover the common cases on Linux.
@@ -177,18 +181,51 @@ install_zsh() {
   if [ "$PKG_MGR" = "brew" ]; then
     zsh_pkgs="$zsh_pkgs zsh-completions"
   fi
+
+  # openSUSE's default repos don't ship the zsh plugins (and the old OBS repo was
+  # retired). Fall back to git-cloning them into ~/.local/share/zsh-plugins - they're
+  # pure zsh scripts, no build step, same pattern as ble.sh for bash.
+  local ZSH_PLUGIN_DIR="$HOME/.local/share/zsh-plugins"
+  local git_clone_plugins="no"
+  if [ "$PKG_MGR" = "zypper" ] && ! zypper --non-interactive info zsh-autosuggestions 2>/dev/null | grep -q "^Name"; then
+    warn "openSUSE's default repos don't include zsh-autosuggestions / zsh-syntax-highlighting."
+    if ask_yes_no "Install them from source (git clone into ~/.local/share/zsh-plugins)?"; then
+      git_clone_plugins="yes"
+      # Drop them from the package-install list since we're handling them differently
+      zsh_pkgs="fzf"
+    else
+      fail "Cannot install zsh plugins. Add them yourself or use bash/fish instead."
+    fi
+  fi
+
   for pkg in $zsh_pkgs; do install_pkg "$pkg"; done
 
-  # Auto-detect installed plugin paths across distros
+  if [ "$git_clone_plugins" = "yes" ]; then
+    mkdir -p "$ZSH_PLUGIN_DIR"
+    for repo in zsh-autosuggestions zsh-syntax-highlighting; do
+      if [ -d "$ZSH_PLUGIN_DIR/$repo/.git" ]; then
+        info "$repo already cloned"
+      else
+        warn "Cloning $repo..."
+        git clone --depth 1 "https://github.com/zsh-users/$repo.git" "$ZSH_PLUGIN_DIR/$repo" \
+          || fail "git clone of $repo failed"
+        info "$repo cloned to $ZSH_PLUGIN_DIR/$repo"
+      fi
+    done
+  fi
+
+  # Auto-detect installed plugin paths across distros (including git-clone fallback)
   local SUGGEST HIGHLIGHT COMP_DIR
   SUGGEST=$(find_first \
     "$PKG_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
     "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
-    "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh")
+    "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "$ZSH_PLUGIN_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh")
   HIGHLIGHT=$(find_first \
     "$PKG_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
     "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
-    "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh")
+    "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+    "$ZSH_PLUGIN_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh")
   COMP_DIR=$(find_first \
     "$PKG_PREFIX/share/zsh-completions" \
     "/usr/share/zsh-completions" \
@@ -695,6 +732,12 @@ uninstall_zsh() {
     for pkg in zsh-autosuggestions zsh-syntax-highlighting zsh-completions fzf; do
       uninstall_pkg "$pkg"
     done
+  fi
+
+  local ZSH_PLUGIN_DIR="$HOME/.local/share/zsh-plugins"
+  if [ -d "$ZSH_PLUGIN_DIR" ] && ask_yes_no "Delete git-cloned zsh plugins at $ZSH_PLUGIN_DIR?"; then
+    rm -rf "$ZSH_PLUGIN_DIR"
+    info "Removed $ZSH_PLUGIN_DIR"
   fi
 }
 

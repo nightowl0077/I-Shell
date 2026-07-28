@@ -28,7 +28,9 @@ Optional add-ons:
 - For Ghostty on Arch: an AUR helper (`yay` or `paru`) since Ghostty is only on the AUR
 - For Ghostty on Fedora: willingness to enable the `pgdev/ghostty` COPR (script asks before doing so)
 
-> **Tested on**: macOS + Homebrew, Debian/Ubuntu + apt. Fedora/Arch/openSUSE support is code-complete and uses runtime path auto-detection (tries multiple candidate paths for plugin files rather than hardcoding per-distro layouts), but community testing is welcome - please open an issue if something breaks.
+> **Tested in Docker sandboxes**: Ubuntu 24.04, Fedora 41, Arch Linux, openSUSE Tumbleweed all pass the zsh install path. Plugin file paths are auto-detected at runtime (tries multiple candidate locations) rather than hardcoded per-distro, so distro layout changes don't break it.
+>
+> **openSUSE note**: the `shells:zsh-users` OBS community repo that used to host `zsh-autosuggestions` and `zsh-syntax-highlighting` has been retired. On openSUSE the installer instead offers to git-clone the two plugins directly from `github.com/zsh-users` into `~/.local/share/zsh-plugins/`. No third-party repo required.
 
 ## Usage
 
